@@ -1,10 +1,7 @@
-import math
-from curses.ascii import isalnum
 from flask_app.config.mysqlconnection import connectToMySQL
 from flask import flash
 import re
 
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9.+_-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]+$')
 class User():
     def __init__(self, data):
         self.id = data['id']
@@ -15,40 +12,55 @@ class User():
         self.created_at = data['created_at']
         self.updated_at = data['updated_at']
 
-    # @staticmethod
-    # def validate_email( emails ):
-    #     is_valid = True
-    #     # test whether a field matches the pattern
-    #     if not EMAIL_REGEX.match(emails['email']): 
-    #         flash("Invalid email address!")
-    #     is_valid = False
-    #     return is_valid
-
     @classmethod
     def user_registration(cls, data):
         query = "INSERT INTO users ( first_name, last_name, email, password ) VALUES ( %(firstname)s , %(lastname)s, %(email)s, %(password)s );"
         # data is a dictionary that will be passed into the save method from server.py
         return connectToMySQL('users_schema').query_db( query, data )
 
+    @classmethod 
+    def get_user_by_email(cls, data):
+        query = "SELECT * FROM users WHERE email = %(email)s;"
+
+        results = connectToMySQL('users_schema').query_db( query, data )
+
+        if len(results) == 0:
+            return False
+        else:
+            return cls(results[0])
+
     @staticmethod
     def validate_registration(data):
         is_valid = True
-        if math.isnan(int(data["firstname"])) == False:
-            flash("First name must be letters and not numbers!")
+        EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9.+_-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]+$')
+        LETTER = re.compile(r'^[a-zA-Z]+$')
+
+        if  not LETTER.match(data['firstname']):
+            flash("Firstname should be just letter's only!")
             is_valid = False
         if len(data['firstname']) < 2 :
             flash("First name must be at least 2 characters long!")
             is_valid = False
+
+        if  not LETTER.match(data['lastname']):
+            flash("Lastname should be just letter's only!")
+            is_valid = False
         if len(data['lastname']) < 2:
             flash("Last name must be at least 2 characters long!")
             is_valid = False
-        if not EMAIL_REGEX.match(data['email']): 
+
+        if  User.get_user_by_email(data): #checking is it already in the database
+            flash("Email already exists!")
+            is_valid = False
+        if  not EMAIL_REGEX.match(data['email']): 
             flash("Invalid email address!")
             is_valid = False
+
         if len(data['password']) < 8:
             flash("Password must be at least 8 characters long!")
             is_valid = False
         if data['password'] != data['confirm_password']:
             flash("Passwords do not match!")
             is_valid = False
+
         return is_valid
